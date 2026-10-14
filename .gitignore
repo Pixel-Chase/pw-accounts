@@ -1,0 +1,5 @@
+node_modules/
+.playwright-cli/
+# 发布用的 token 不入库
+.npmrc
+*.tgz
