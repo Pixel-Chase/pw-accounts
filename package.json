@@ -1,6 +1,6 @@
 {
   "name": "@zerolinkspace/pw-accounts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Multi-account Playwright sessions for AI coding agents: log in once by hand, let Claude Code / Codex debug pages as that user.",
   "type": "module",
   "license": "MIT",
