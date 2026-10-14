@@ -136,9 +136,44 @@ export function resolveTarget(account, target) {
   return `${new URL(account.url).origin}/${target.replace(/^\/+/, '')}`;
 }
 
+// id 目录记录允许使用它的项目。只认 accounts.json 里的 id 的话，任何仓库抄一个 id 就能借走别的项目的登录态
+export function boundProjects(home) {
+  return readJson(path.join(home, META_FILE))?.projects ?? [];
+}
+
+// 'unbound'：还没有项目登录过；'foreign'：登录态属于其他项目
+export function bindingState(project) {
+  const projects = boundProjects(project.home);
+  if (!projects.length) return 'unbound';
+  return projects.includes(project.root) ? 'bound' : 'foreign';
+}
+
+export function assertBound(project) {
+  if (bindingState(project) !== 'foreign') return;
+  throw new PwaError(
+    `登录态目录 ${project.home} 属于其他项目（${boundProjects(project.home).join('、')}），当前项目未获授权使用。` +
+      '如果这是同一项目的副本或项目已移动，请用户在终端执行 pwa 确认',
+  );
+}
+
+export function bindProject(project) {
+  const projects = boundProjects(project.home);
+  if (projects.includes(project.root)) return;
+  fs.mkdirSync(project.home, { recursive: true, mode: 0o700 });
+  writeJson(path.join(project.home, META_FILE), { projects: [...projects, project.root] });
+}
+
+// 不共用已有登录态时，给当前项目换一个新 id（需要重新登录）
+export function regenerateId(project) {
+  project.cfg.id = newId(project.root);
+  saveProject(project);
+  return readProject(project.root);
+}
+
+// 首次登录时把当前项目绑定到 id 目录；login 只能由人在交互式终端执行
 export function ensureProfileDir(project, account) {
+  assertBound(project);
   fs.mkdirSync(account.profile, { recursive: true });
   for (const dir of [PWA_HOME, project.home, account.profile]) fs.chmodSync(dir, 0o700);
-  const metaFile = path.join(project.home, META_FILE);
-  if (readJson(metaFile)?.project !== project.root) writeJson(metaFile, { project: project.root });
+  bindProject(project);
 }

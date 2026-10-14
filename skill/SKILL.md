@@ -28,6 +28,7 @@ pwa close <account>                   # 调试结束必须用它正常关闭
 - **只用 `pwa close` 关闭**，不要用 `playwright-cli kill-all` 或杀进程，否则可能丢失刚刷新的 token，导致账号掉线。
 - **不要直接调用 `playwright-cli open`**，它不会带上账号的 profile。会话未打开时用 `pwa open`。
 - **不要用 `pwa reset`**，除非用户明确要求清除登录态。
+- 提示“登录态目录属于其他项目”时，停下来请用户在自己的终端执行 `pwa` 确认。不要修改 accounts.json 里的 `id` 来绕过。
 - **跨 origin 不共享登录态**：token 存放在 localStorage，按 协议+域名+端口 隔离。只用相对路径，或者与账号 `url` 同 origin 的地址；换端口、`localhost` 改成 `127.0.0.1` 都等于未登录。
 - 同一账号同一时间只能有一个浏览器使用（profile 会被锁）。不同账号可以同时打开，用来对比不同角色看到的页面。
 - 当前目录找不到 `.playwright/accounts.json`，或者需要的账号不存在时，告诉用户在终端执行 `pwa` 进行初始化、添加账号。不要自行编造账号入口地址，也不要自己修改 accounts.json。

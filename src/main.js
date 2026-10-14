@@ -1,4 +1,4 @@
-import { createProject, getAccount, loadProject } from './config.js';
+import { assertBound, bindingState, createProject, getAccount, loadProject } from './config.js';
 import { accountStatus, closeIfOpen, login, open, reset } from './ops.js';
 import { findSession, pwcli } from './pwcli.js';
 import { doctor, setup } from './setup.js';
@@ -19,6 +19,13 @@ const USAGE = `用法:
   pwa <account> <cli 命令...>     透传给 playwright-cli，如: pwa test-admin snapshot`;
 
 const SESSION_LABEL = { headless: '无界面', headed: '有界面' };
+
+// 会用到登录态的命令都先确认当前项目有权使用这个 id 的登录态
+function loadBoundProject() {
+  const project = loadProject();
+  assertBound(project);
+  return project;
+}
 
 export async function main(argv) {
   const [cmd, ...rest] = argv;
@@ -53,6 +60,7 @@ export async function main(argv) {
       const status = await accountStatus(project);
       console.log(`配置: ${project.file}`);
       console.log(`登录态: ${tildify(project.home)}`);
+      if (bindingState(project) === 'foreign') console.log('  ⚠ 这些登录态属于其他项目，当前项目无权使用，需要在终端执行 pwa 确认');
       const width = Math.max(8, ...status.map((s) => s.name.length));
       for (const s of status) {
         const profile = s.hasProfile ? '有登录态' : '未登录  ';
@@ -64,7 +72,7 @@ export async function main(argv) {
     }
 
     case 'login': {
-      const project = loadProject();
+      const project = loadBoundProject();
       const account = getAccount(project, rest[0]);
       const result = await login(project, account);
       console.log(
@@ -78,7 +86,7 @@ export async function main(argv) {
     case 'open': {
       const headed = rest.includes('--headed');
       const [name, target] = rest.filter((a) => a !== '--headed');
-      const account = getAccount(loadProject(), name);
+      const account = getAccount(loadBoundProject(), name);
       const url = await open(account, target, { headed, warn: (m) => console.error(`pwa: ${m}`) });
       console.log(`会话 ${account.session} 已就绪: ${url}`);
       console.log(`后续操作: pwa ${account.name} <snapshot|click|screenshot|...>`);
@@ -86,19 +94,19 @@ export async function main(argv) {
     }
 
     case 'close': {
-      const account = getAccount(loadProject(), rest[0]);
+      const account = getAccount(loadBoundProject(), rest[0]);
       console.log((await closeIfOpen(account)) ? `已关闭 ${account.session}` : `${account.session} 未打开`);
       return 0;
     }
 
     case 'reset': {
-      const account = getAccount(loadProject(), rest[0]);
+      const account = getAccount(loadBoundProject(), rest[0]);
       console.log((await reset(account)) ? `已删除 ${account.profile}` : `${account.profile} 不存在`);
       return 0;
     }
 
     default: {
-      const account = getAccount(loadProject(), cmd);
+      const account = getAccount(loadBoundProject(), cmd);
       // 不让 playwright-cli 自己报“未打开”：它会提示直接 playwright-cli open，绕过 profile
       if (!rest.includes('--help') && !(await findSession(account))) throw new PwaError(`会话 ${account.session} 未打开，先执行: pwa open ${account.name}`);
       return (await pwcli([`-s=${account.session}`, ...rest], { inherit: true })).code;

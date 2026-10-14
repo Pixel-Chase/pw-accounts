@@ -4,11 +4,15 @@ import path from 'node:path';
 import * as p from '@clack/prompts';
 import {
   DEFAULT_LOGIN_PATTERN,
+  bindProject,
+  bindingState,
+  boundProjects,
   configPath,
   createProject,
   findProjectRoot,
   getAccount,
   readProject,
+  regenerateId,
   validateAccountName,
   validatePattern,
   validateUrl,
@@ -46,6 +50,7 @@ export async function runTui() {
     if (await ask(p.confirm({ message: '现在执行 pwa setup？' }))) await setup(p.log.info);
   }
   let project = await ensureProject();
+  if (project && bindingState(project) === 'foreign') project = await resolveForeign(project);
   while (project) {
     const n = Object.keys(project.cfg.accounts).length;
     const action = await ask(
@@ -106,6 +111,33 @@ async function ensureProject() {
   p.log.success(`已创建 ${tildify(project.file)}（id: ${project.cfg.id}）`);
   await addFlow(project);
   return readProject(dir);
+}
+
+// 登录态目录已绑定到别的项目：可能是同一项目的副本或项目移动了位置，也可能是别的仓库抄了这个 id
+async function resolveForeign(project) {
+  const owners = boundProjects(project.home).map(tildify).join('\n');
+  p.log.warn(`登录态目录 ${tildify(project.home)} 属于其他项目：\n${owners}`);
+  const choice = await ask(
+    p.select({
+      message: '当前项目怎么处理？',
+      options: [
+        { value: 'share', label: '共用这些登录态', hint: '同一项目的副本（worktree、重新 clone）或项目移动了位置' },
+        { value: 'new', label: '改用新的 id', hint: '不认识上面的项目时选这个，账号需要重新登录' },
+        { value: null, label: '退出' },
+      ],
+    }),
+  );
+  if (choice === 'share') {
+    bindProject(project);
+    p.log.success('已允许当前项目使用这些登录态');
+    return project;
+  }
+  if (choice === 'new') {
+    const next = regenerateId(project);
+    p.log.success(`已改用新的 id：${next.cfg.id}，请重新登录各账号`);
+    return next;
+  }
+  return null;
 }
 
 async function pickAccount(project, message, { onlyLoggedIn = false } = {}) {

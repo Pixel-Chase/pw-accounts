@@ -5,7 +5,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import {
   CONFIG_DIR,
   CONFIG_FILE,
-  META_FILE,
+  boundProjects,
   ensureProfileDir,
   isLoginPage,
   resolveTarget,
@@ -166,16 +166,20 @@ export function scanStaleProfiles() {
   for (const d of fs.readdirSync(PWA_HOME, { withFileTypes: true })) {
     if (!d.isDirectory()) continue;
     const dir = path.join(PWA_HOME, d.name);
-    const project = readJson(path.join(dir, META_FILE))?.project;
-    const cfg = project && readJson(path.join(project, CONFIG_DIR, CONFIG_FILE));
-    if (!project) {
+    const projects = boundProjects(dir);
+    // 绑定过的项目里，配置仍指向这个 id 的才算还在用
+    const live = projects
+      .map((root) => ({ root, cfg: readJson(path.join(root, CONFIG_DIR, CONFIG_FILE)) }))
+      .filter((p) => p.cfg?.id === d.name);
+    if (!projects.length) {
       stale.push({ dir, label: d.name, reason: '来源不明', orphan: false });
-    } else if (cfg?.id !== d.name) {
-      stale.push({ dir, label: d.name, reason: `项目已删除或已重新初始化：${project}`, orphan: true });
+    } else if (!live.length) {
+      stale.push({ dir, label: d.name, reason: `项目已删除或已重新初始化：${projects.join('、')}`, orphan: true });
     } else {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (e.isDirectory() && !Object.hasOwn(cfg.accounts ?? {}, e.name)) {
-          stale.push({ dir: path.join(dir, e.name), label: `${d.name}/${e.name}`, reason: `账号已从 ${project} 的配置中移除`, orphan: true });
+        if (e.isDirectory() && !live.some((p) => Object.hasOwn(p.cfg.accounts ?? {}, e.name))) {
+          const where = live.map((p) => p.root).join('、');
+          stale.push({ dir: path.join(dir, e.name), label: `${d.name}/${e.name}`, reason: `账号已从 ${where} 的配置中移除`, orphan: true });
         }
       }
     }
