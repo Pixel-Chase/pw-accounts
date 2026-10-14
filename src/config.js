@@ -141,17 +141,20 @@ export function boundProjects(home) {
   return readJson(path.join(home, META_FILE))?.projects ?? [];
 }
 
-// 'unbound'：还没有项目登录过；'foreign'：登录态属于其他项目
+// 'unbound'：还没有登录态；'foreign'：登录态属于其他项目，或者已有登录态却没有归属记录
+// （记录被删或首次登录中断）。后者不能放行，否则任何写了这个 id 的仓库都能直接使用
 export function bindingState(project) {
   const projects = boundProjects(project.home);
-  if (!projects.length) return 'unbound';
-  return projects.includes(project.root) ? 'bound' : 'foreign';
+  if (projects.length) return projects.includes(project.root) ? 'bound' : 'foreign';
+  const hasProfiles = fs.existsSync(project.home) && fs.readdirSync(project.home).some((n) => n !== META_FILE);
+  return hasProfiles ? 'foreign' : 'unbound';
 }
 
 export function assertBound(project) {
   if (bindingState(project) !== 'foreign') return;
+  const owners = boundProjects(project.home).join('、') || '没有归属记录';
   throw new PwaError(
-    `登录态目录 ${project.home} 属于其他项目（${boundProjects(project.home).join('、')}），当前项目未获授权使用。` +
+    `登录态目录 ${project.home} 不属于当前项目（${owners}），当前项目未获授权使用。` +
       '如果这是同一项目的副本或项目已移动，请用户在终端执行 pwa 确认',
   );
 }

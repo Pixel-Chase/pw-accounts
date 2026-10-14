@@ -60,7 +60,7 @@ export async function main(argv) {
       const status = await accountStatus(project);
       console.log(`配置: ${project.file}`);
       console.log(`登录态: ${tildify(project.home)}`);
-      if (bindingState(project) === 'foreign') console.log('  ⚠ 这些登录态属于其他项目，当前项目无权使用，需要在终端执行 pwa 确认');
+      if (bindingState(project) === 'foreign') console.log('  ⚠ 这些登录态不属于当前项目，无权使用，需要在终端执行 pwa 确认');
       const width = Math.max(8, ...status.map((s) => s.name.length));
       for (const s of status) {
         const profile = s.hasProfile ? '有登录态' : '未登录  ';

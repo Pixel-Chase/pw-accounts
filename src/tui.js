@@ -116,7 +116,11 @@ async function ensureProject() {
 // 登录态目录已绑定到别的项目：可能是同一项目的副本或项目移动了位置，也可能是别的仓库抄了这个 id
 async function resolveForeign(project) {
   const owners = boundProjects(project.home).map(tildify).join('\n');
-  p.log.warn(`登录态目录 ${tildify(project.home)} 属于其他项目：\n${owners}`);
+  p.log.warn(
+    owners
+      ? `登录态目录 ${tildify(project.home)} 属于其他项目：\n${owners}`
+      : `登录态目录 ${tildify(project.home)} 已有登录态，但没有记录属于哪个项目`,
+  );
   const choice = await ask(
     p.select({
       message: '当前项目怎么处理？',
